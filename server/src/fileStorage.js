@@ -5,11 +5,14 @@ import { isDriveConfigured, copyFile as driveCopyFile } from './googleDrive.js';
 import { fillClientNameIfPossible } from './pptx.js';
 
 const serverRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-// Las plantillas son contenido de la app: viven versionadas en git para que el deploy
-// las tenga disponibles sin depender de una carpeta local del usuario. Las propuestas
-// generadas por cliente son datos de runtime: no se versionan.
+// Las plantillas son contenido de la app: viven versionadas en git (solo lectura en
+// runtime) para que el deploy las tenga disponibles sin depender de una carpeta local del
+// usuario. Las propuestas generadas por cliente son datos de runtime: no se versionan, y en
+// Vercel el filesystem del deploy es de solo lectura salvo /tmp (efimero).
 const templatesDir = path.join(serverRoot, 'assets', 'templates');
-const proposalsDir = path.join(serverRoot, 'data', 'files', 'proposals');
+const proposalsDir = process.env.VERCEL
+  ? '/tmp/proposals'
+  : path.join(serverRoot, 'data', 'files', 'proposals');
 fs.mkdirSync(templatesDir, { recursive: true });
 fs.mkdirSync(proposalsDir, { recursive: true });
 

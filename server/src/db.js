@@ -5,10 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 const serverRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Resuelta relativa a server/, no al directorio de trabajo del proceso: en el host de
-// produccion el proceso puede arrancar con el cwd en la raiz del repo.
-const resolvedPath = process.env.DB_PATH
-  ? path.resolve(process.env.DB_PATH)
-  : path.join(serverRoot, 'data', 'propuestas.db');
+// produccion el proceso puede arrancar con el cwd en la raiz del repo. En Vercel el
+// filesystem del deploy es de solo lectura salvo /tmp (efimero por invocacion).
+const resolvedPath = process.env.VERCEL
+  ? '/tmp/propuestas.db'
+  : process.env.DB_PATH
+    ? path.resolve(process.env.DB_PATH)
+    : path.join(serverRoot, 'data', 'propuestas.db');
 fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
 
 const sqlite = new DatabaseSync(resolvedPath);
