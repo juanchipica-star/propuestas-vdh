@@ -2,14 +2,21 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import StatusBadge from '../StatusBadge.jsx';
+import NewProposalModal from '../NewProposalModal.jsx';
 
 export default function ClientDetail() {
   const { id } = useParams();
   const [client, setClient] = useState(null);
   const [error, setError] = useState('');
+  const [showNewProposal, setShowNewProposal] = useState(false);
+
+  function load() {
+    api.getClient(id).then(setClient).catch((err) => setError(err.message));
+  }
 
   useEffect(() => {
-    api.getClient(id).then(setClient).catch((err) => setError(err.message));
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (error) return <p className="error-text">{error}</p>;
@@ -17,7 +24,10 @@ export default function ClientDetail() {
 
   return (
     <>
-      <h2>{client.name}</h2>
+      <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0 }}>{client.name}</h2>
+        <button onClick={() => setShowNewProposal(true)}>+ Nueva propuesta</button>
+      </div>
 
       <div className="card">
         <p><strong>Contacto:</strong> {client.contact_name || '-'}</p>
@@ -57,6 +67,14 @@ export default function ClientDetail() {
           </table>
         )}
       </div>
+
+      {showNewProposal && (
+        <NewProposalModal
+          initialClientId={client.id}
+          onClose={() => setShowNewProposal(false)}
+          onCreated={load}
+        />
+      )}
     </>
   );
 }

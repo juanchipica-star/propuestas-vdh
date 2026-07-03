@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import StatusBadge from '../StatusBadge.jsx';
+import NewProposalModal from '../NewProposalModal.jsx';
 
 const STATUSES = ['', 'borrador', 'enviada', 'pendiente', 'aprobada', 'rechazada'];
 
@@ -11,6 +12,7 @@ export default function Dashboard() {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showNewProposal, setShowNewProposal] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -37,7 +39,10 @@ export default function Dashboard() {
 
   return (
     <>
-      <h2>Dashboard de propuestas</h2>
+      <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0 }}>Dashboard de propuestas</h2>
+        <button onClick={() => setShowNewProposal(true)}>+ Nueva propuesta</button>
+      </div>
 
       <form className="toolbar" onSubmit={onSearchSubmit}>
         <input
@@ -94,6 +99,10 @@ export default function Dashboard() {
           </table>
         )}
       </div>
+
+      {showNewProposal && (
+        <NewProposalModal onClose={() => setShowNewProposal(false)} onCreated={load} />
+      )}
     </>
   );
 }
