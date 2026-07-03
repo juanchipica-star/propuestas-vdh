@@ -68,10 +68,36 @@ export default function ProposalDetail() {
               Abrir en Google Drive
             </a>
           )}
+          {proposal.file_url && (
+            <a className="link" href={proposal.file_url}>
+              Descargar archivo (.pptx)
+            </a>
+          )}
         </div>
         <p><strong>Enviada:</strong> {proposal.sent_at ? new Date(proposal.sent_at).toLocaleString() : '-'}</p>
         <p><strong>Respondida:</strong> {proposal.responded_at ? new Date(proposal.responded_at).toLocaleString() : '-'}</p>
       </div>
+
+      {proposal.pricing_snapshot && (
+        <div className="card">
+          <h3>Honorarios cotizados</h3>
+          {(() => {
+            const pricing = JSON.parse(proposal.pricing_snapshot);
+            return (
+              <table>
+                <tbody>
+                  <tr><td>Salario mensual</td><td>{Number(proposal.base_salary).toLocaleString()}</td></tr>
+                  <tr><td>Compensacion anual</td><td>{pricing.annual_compensation.toLocaleString()}</td></tr>
+                  <tr><td>Fee ({proposal.fee_pct}%)</td><td>{pricing.fee_amount.toLocaleString()}</td></tr>
+                  {pricing.installments.map((i) => (
+                    <tr key={i.label}><td>{i.label}</td><td>{i.amount.toLocaleString()}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
+        </div>
+      )}
 
       <div className="card">
         <h3>Notas</h3>

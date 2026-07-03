@@ -1,14 +1,38 @@
 # Propuestas App
 
 App interna para organizar propuestas comerciales por cliente, hacer seguimiento de su estado
-(borrador / enviada / pendiente / aprobada / rechazada) y crear propuestas nuevas copiando
-plantillas PPT desde Google Drive.
+(borrador / enviada / pendiente / aprobada / rechazada) y crear propuestas nuevas a partir de
+plantillas PPT reales de VDH, ya sea en Google Drive o guardadas localmente.
 
 ## Estructura
 
 - `server/` — API en Node.js + Express, con SQLite (modulo nativo `node:sqlite`, sin dependencias
-  de compilacion) como base de datos.
+  de compilacion) como base de datos, y generacion de PPT (`jszip`, sin dependencias nativas).
 - `client/` — Interfaz en React (Vite).
+
+## Importar las plantillas reales de VDH
+
+Las plantillas (Coaching, Executive Search, Talent Acquisition, Talent Search, Market Insights,
+Assessment, Selfplacement, Future Quest, mas sus versiones en ingles) se importan una vez desde
+`server/`:
+
+```powershell
+npm run import-vdh -- "C:\Users\DELL\Downloads\Propuestas VDH"
+```
+
+Copia los `.pptx` a `server/data/files/templates/`, registra cada uno como plantilla (con su tipo
+de servicio e idioma), y carga la propuesta real ya enviada a Desol (Market Insights) como historial.
+
+Al generar una propuesta nueva desde una plantilla:
+- Si la plantilla tiene un cuadro de texto vacio en la portada (Coaching, Market Insights,
+  Selfplacement), la app **completa el nombre del cliente automaticamente**.
+- En el resto (Executive Search, Talent Acquisition, Talent Search, Future Quest, Assessment, el
+  deck institucional), la portada no tiene ese cuadro — se sigue completando a mano en PowerPoint,
+  como antes. La app lo indica claramente en la pagina de Plantillas.
+- Para Executive Search / Talent Acquisition / Talent Search hay una **calculadora de honorarios**
+  (salario, pagos por año, % bono, % fee) que calcula el fee y las cuotas (formula verificada
+  contra los ejemplos reales de los PPT) para copiar a mano en la tabla del PPT. El calculo queda
+  guardado en la propuesta como registro de lo cotizado.
 
 ## Requisitos
 
@@ -69,13 +93,17 @@ pagina de **Plantillas** y el boton "Crear propuesta desde plantilla" requieren 
 ## Modelo de datos
 
 - **Clientes**: nombre, contacto, email, telefono, notas.
-- **Plantillas**: PPTs maestros (sincronizados desde Drive o agregados a mano via API).
-- **Propuestas**: titulo, cliente, plantilla de origen (si aplica), link a Drive, estado, fechas
-  de envio/respuesta, notas.
+- **Plantillas**: PPTs maestros (locales o en Drive), con tipo de servicio, idioma y si tienen
+  placeholder de nombre de cliente.
+- **Propuestas**: titulo, cliente, plantilla de origen (si aplica), tipo de servicio, archivo
+  generado (local o Drive), estado, fechas de envio/respuesta, datos de honorarios cotizados
+  (cuando aplica), notas.
 - **Historial de estados**: registro de cada cambio de estado de una propuesta.
 
 ## Notas
 
 - La base de datos SQLite se guarda en `server/data/propuestas.db` (no se versiona en git).
+- Los PPT (plantillas y propuestas generadas) se guardan en `server/data/files/` cuando Drive no
+  esta configurado (no se versionan en git).
 - No hay login de usuarios en esta primera version; la app esta pensada para correr en la red
   interna de la empresa.

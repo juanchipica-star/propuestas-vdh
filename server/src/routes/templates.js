@@ -1,8 +1,29 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { listFilesInFolder, isDriveConfigured } from '../googleDrive.js';
+import { fileUrlFor } from '../fileStorage.js';
 
 export const templatesRouter = Router();
+
+const SERVICE_TYPE_LABELS = {
+  coaching: 'Coaching',
+  executive_search: 'Executive Search',
+  talent_acquisition: 'Talent Acquisition',
+  talent_search: 'Talent Search',
+  market_insights: 'Market Insights',
+  assessment: 'Assessment',
+  selfplacement: 'Selfplacement',
+  future_quest: 'Future Quest',
+  institucional: 'Institucional',
+};
+
+function withExtras(template) {
+  return {
+    ...template,
+    file_url: fileUrlFor(template.file_path),
+    service_type_label: SERVICE_TYPE_LABELS[template.service_type] || template.service_type,
+  };
+}
 
 // Lista las plantillas guardadas en la BD. Si Drive esta configurado y hay una carpeta
 // de plantillas definida, sincroniza primero los archivos nuevos encontrados en Drive.
@@ -27,7 +48,7 @@ templatesRouter.get('/', async (req, res) => {
   }
 
   const templates = db.prepare('SELECT * FROM templates ORDER BY name COLLATE NOCASE').all();
-  res.json({ templates, driveConfigured: isDriveConfigured() && Boolean(folderId) });
+  res.json({ templates: templates.map(withExtras), driveConfigured: isDriveConfigured() && Boolean(folderId) });
 });
 
 templatesRouter.post('/', (req, res) => {

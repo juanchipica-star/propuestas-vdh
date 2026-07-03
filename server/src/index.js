@@ -1,10 +1,13 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'node:path';
 import './db.js';
 import { clientsRouter } from './routes/clients.js';
 import { proposalsRouter } from './routes/proposals.js';
 import { templatesRouter } from './routes/templates.js';
+import { pricingRouter } from './routes/pricing.js';
+import { paths } from './fileStorage.js';
 
 const app = express();
 app.use(cors());
@@ -13,6 +16,21 @@ app.use(express.json());
 app.use('/api/clients', clientsRouter);
 app.use('/api/proposals', proposalsRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/pricing', pricingRouter);
+
+const FILE_DIRS = { templates: paths.templatesDir, proposals: paths.proposalsDir };
+
+app.get('/api/files/:kind/:filename', (req, res) => {
+  const dir = FILE_DIRS[req.params.kind];
+  if (!dir) return res.status(404).json({ error: 'Tipo de archivo desconocido' });
+
+  const filePath = path.join(dir, req.params.filename);
+  if (!filePath.startsWith(dir)) return res.status(400).json({ error: 'Ruta invalida' });
+
+  res.download(filePath, req.params.filename, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'Archivo no encontrado' });
+  });
+});
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

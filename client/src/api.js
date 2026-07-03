@@ -32,4 +32,8 @@ export const api = {
 
   getTemplates: () => request('/templates'),
   createTemplate: (body) => request('/templates', { method: 'POST', body: JSON.stringify(body) }),
+
+  calculateFee: (body) => request('/pricing/fee-calc', { method: 'POST', body: JSON.stringify(body) }),
 };
+
+export const SEARCH_SERVICE_TYPES = ['executive_search', 'talent_acquisition', 'talent_search'];
