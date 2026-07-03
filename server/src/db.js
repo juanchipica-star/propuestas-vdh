@@ -3,8 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dbPath = process.env.DB_PATH || './data/propuestas.db';
-const resolvedPath = path.resolve(dbPath);
+const serverRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Resuelta relativa a server/, no al directorio de trabajo del proceso: en el host de
+// produccion el proceso puede arrancar con el cwd en la raiz del repo.
+const resolvedPath = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.join(serverRoot, 'data', 'propuestas.db');
 fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
 
 const sqlite = new DatabaseSync(resolvedPath);

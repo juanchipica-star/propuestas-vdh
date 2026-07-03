@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import './db.js';
 import { clientsRouter } from './routes/clients.js';
 import { proposalsRouter } from './routes/proposals.js';
@@ -33,6 +35,14 @@ app.get('/api/files/:kind/:filename', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// En produccion, el build del frontend (client/dist) se sirve desde este mismo servidor:
+// un solo servicio para desplegar, sin depender de otro host ni de CORS.
+const clientDist = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'client', 'dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get(/^(?!\/api).*/, (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
 
 app.use((err, req, res, next) => {
   console.error(err);

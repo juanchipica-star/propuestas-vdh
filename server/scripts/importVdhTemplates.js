@@ -107,7 +107,8 @@ if (fs.existsSync(desolFile)) {
     .prepare("SELECT * FROM templates WHERE service_type = 'market_insights' AND language = 'es'")
     .get();
 
-  const destPath = copyIntoTemplates(desolFile, `Desol - Market Insights.pptx`);
+  const destPath = path.join(paths.proposalsDir, `Desol - Market Insights.pptx`);
+  fs.copyFileSync(desolFile, destPath);
   const sentAt = '2026-05-29 00:00:00';
 
   const result = db
