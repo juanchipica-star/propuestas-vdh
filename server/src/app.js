@@ -12,7 +12,7 @@ import { templatesRouter } from './routes/templates.js';
 import { pricingRouter } from './routes/pricing.js';
 import { paths } from './fileStorage.js';
 
-seedTemplatesIfEmpty();
+await seedTemplatesIfEmpty();
 
 const app = express();
 app.use(cors());

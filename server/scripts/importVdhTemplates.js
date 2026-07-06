@@ -1,9 +1,10 @@
 // Ejecutar con: npm run import-vdh -- "C:\Users\DELL\Downloads\Propuestas VDH"
-// Copia las plantillas maestras reales de VDH a server/data/files/templates, las registra
-// en la base y carga la propuesta ya enviada (Desol / Market Insights) como historial.
+// Herramienta de autor: copia las plantillas maestras reales de VDH a
+// server/assets/templates (y el historico a server/assets/seed) y las registra en la base
+// local. Solo hace falta correrla de nuevo si cambian los archivos fuente - en cada arranque
+// normal de la app, seedTemplates.js ya puebla la base sola desde los archivos versionados.
 import fs from 'node:fs';
 import path from 'node:path';
-import '../src/db.js';
 import { db } from '../src/db.js';
 import { paths } from '../src/fileStorage.js';
 
@@ -42,13 +43,13 @@ const insertTemplate = db.prepare(
    VALUES (@name, @service_type, @language, @has_client_placeholder, @file_path, @category)`
 );
 
-let imported = 0;
-
 function copyIntoTemplates(sourcePath, destName) {
   const destPath = path.join(paths.templatesDir, destName);
   fs.copyFileSync(sourcePath, destPath);
   return destPath;
 }
+
+let imported = 0;
 
 for (const t of TEMPLATE_MAP) {
   const sourcePath = path.join(sourceDir, t.file);
@@ -57,7 +58,7 @@ for (const t of TEMPLATE_MAP) {
     continue;
   }
   const destPath = copyIntoTemplates(sourcePath, `${t.name}.pptx`);
-  insertTemplate.run({
+  await insertTemplate.run({
     name: t.name,
     service_type: t.service_type,
     language: t.language,
@@ -80,7 +81,7 @@ if (fs.existsSync(englishDirPath)) {
     }
     const sourcePath = path.join(englishDirPath, file);
     const destPath = copyIntoTemplates(sourcePath, `${entry.name}.pptx`);
-    insertTemplate.run({
+    await insertTemplate.run({
       name: entry.name,
       service_type: entry.service_type,
       language: 'en',
@@ -95,34 +96,37 @@ if (fs.existsSync(englishDirPath)) {
   console.warn(`Omitida carpeta de plantillas en inglés (no encontrada): ${ENGLISH_DIR}`);
 }
 
-// Historial: la propuesta real ya enviada a Desol (Market Insights, 2026-05-29).
+// Historial: la propuesta real ya enviada a Desol (Market Insights, 2026-05-29). Tambien
+// copia el archivo a assets/seed para que seedTemplates.js lo pueda auto-sembrar despues.
 const desolFile = path.join(sourceDir, '2026.05.29 - Desol - VDH Market Insights Propuesta .pptx');
 if (fs.existsSync(desolFile)) {
-  const existingClient = db.prepare('SELECT * FROM clients WHERE name = ?').get('Desol');
+  const existingClient = await db.prepare('SELECT * FROM clients WHERE name = ?').get('Desol');
   const clientId = existingClient
     ? existingClient.id
-    : db.prepare('INSERT INTO clients (name) VALUES (?)').run('Desol').lastInsertRowid;
+    : (await db.prepare('INSERT INTO clients (name) VALUES (?)').run('Desol')).lastInsertRowid;
 
-  const marketInsightsTemplate = db
+  const marketInsightsTemplate = await db
     .prepare("SELECT * FROM templates WHERE service_type = 'market_insights' AND language = 'es'")
     .get();
+
+  const seedDir = path.join(paths.templatesDir, '..', 'seed');
+  fs.mkdirSync(seedDir, { recursive: true });
+  fs.copyFileSync(desolFile, path.join(seedDir, 'Desol - Market Insights.pptx'));
 
   const destPath = path.join(paths.proposalsDir, `Desol - Market Insights.pptx`);
   fs.copyFileSync(desolFile, destPath);
   const sentAt = '2026-05-29 00:00:00';
 
-  const result = db
+  const result = await db
     .prepare(
       `INSERT INTO proposals (client_id, template_id, title, service_type, file_path, status, sent_at)
        VALUES (?, ?, ?, 'market_insights', ?, 'enviada', ?)`
     )
     .run(clientId, marketInsightsTemplate?.id || null, 'Market Insights - Desol', destPath, sentAt);
 
-  db.prepare('INSERT INTO proposal_status_history (proposal_id, status, changed_at) VALUES (?, ?, ?)').run(
-    result.lastInsertRowid,
-    'enviada',
-    sentAt
-  );
+  await db
+    .prepare('INSERT INTO proposal_status_history (proposal_id, status, changed_at) VALUES (?, ?, ?)')
+    .run(result.lastInsertRowid, 'enviada', sentAt);
 
   console.log('Importada propuesta historica: Desol - Market Insights (enviada 2026-05-29)');
 } else {

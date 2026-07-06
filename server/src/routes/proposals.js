@@ -7,8 +7,8 @@ export const proposalsRouter = Router();
 
 const VALID_STATUSES = ['borrador', 'enviada', 'pendiente', 'aprobada', 'rechazada'];
 
-function recordStatusChange(proposalId, status) {
-  db.prepare('INSERT INTO proposal_status_history (proposal_id, status) VALUES (?, ?)').run(
+async function recordStatusChange(proposalId, status) {
+  await db.prepare('INSERT INTO proposal_status_history (proposal_id, status) VALUES (?, ?)').run(
     proposalId,
     status
   );
@@ -19,7 +19,7 @@ function withFileUrl(proposal) {
   return { ...proposal, file_url: fileUrlFor(proposal.file_path) };
 }
 
-proposalsRouter.get('/', (req, res) => {
+proposalsRouter.get('/', async (req, res) => {
   const { status, client_id, q } = req.query;
   const clauses = [];
   const params = {};
@@ -39,7 +39,7 @@ proposalsRouter.get('/', (req, res) => {
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-  const proposals = db
+  const proposals = await db
     .prepare(
       `SELECT p.*, c.name AS client_name
        FROM proposals p
@@ -52,8 +52,8 @@ proposalsRouter.get('/', (req, res) => {
   res.json(proposals.map(withFileUrl));
 });
 
-proposalsRouter.get('/:id', (req, res) => {
-  const proposal = db
+proposalsRouter.get('/:id', async (req, res) => {
+  const proposal = await db
     .prepare(
       `SELECT p.*, c.name AS client_name
        FROM proposals p
@@ -64,29 +64,29 @@ proposalsRouter.get('/:id', (req, res) => {
 
   if (!proposal) return res.status(404).json({ error: 'Propuesta no encontrada' });
 
-  const history = db
+  const history = await db
     .prepare('SELECT * FROM proposal_status_history WHERE proposal_id = ? ORDER BY changed_at DESC')
     .all(req.params.id);
 
   res.json({ ...withFileUrl(proposal), history });
 });
 
-proposalsRouter.post('/', (req, res) => {
+proposalsRouter.post('/', async (req, res) => {
   const { client_id, title, drive_file_id, drive_link, template_id, notes } = req.body;
   if (!client_id || !title || !title.trim()) {
     return res.status(400).json({ error: 'client_id y title son requeridos' });
   }
 
-  const result = db
+  const result = await db
     .prepare(
       `INSERT INTO proposals (client_id, template_id, title, drive_file_id, drive_link, notes)
        VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run(client_id, template_id || null, title.trim(), drive_file_id || null, drive_link || null, notes || null);
 
-  recordStatusChange(result.lastInsertRowid, 'borrador');
+  await recordStatusChange(result.lastInsertRowid, 'borrador');
 
-  const proposal = db.prepare('SELECT * FROM proposals WHERE id = ?').get(result.lastInsertRowid);
+  const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(proposal);
 });
 
@@ -100,8 +100,8 @@ proposalsRouter.post('/from-template', async (req, res) => {
     return res.status(400).json({ error: 'template_id, client_id y title son requeridos' });
   }
 
-  const template = db.prepare('SELECT * FROM templates WHERE id = ?').get(template_id);
-  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
+  const template = await db.prepare('SELECT * FROM templates WHERE id = ?').get(template_id);
+  const client = await db.prepare('SELECT * FROM clients WHERE id = ?').get(client_id);
   if (!template) return res.status(404).json({ error: 'Plantilla no encontrada' });
   if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
 
@@ -113,7 +113,7 @@ proposalsRouter.post('/from-template', async (req, res) => {
         ? calculateFee({ base_salary, payments_per_year, bonus_pct, fee_pct })
         : null;
 
-    const result = db
+    const result = await db
       .prepare(
         `INSERT INTO proposals (
            client_id, template_id, title, service_type, drive_file_id, drive_link, file_path,
@@ -135,9 +135,9 @@ proposalsRouter.post('/from-template', async (req, res) => {
         pricingSnapshot ? JSON.stringify(pricingSnapshot) : null
       );
 
-    recordStatusChange(result.lastInsertRowid, 'borrador');
+    await recordStatusChange(result.lastInsertRowid, 'borrador');
 
-    const proposal = db.prepare('SELECT * FROM proposals WHERE id = ?').get(result.lastInsertRowid);
+    const proposal = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ ...withFileUrl(proposal), filledClientName: file.filledClientName });
   } catch (err) {
     console.error(err);
@@ -145,12 +145,12 @@ proposalsRouter.post('/from-template', async (req, res) => {
   }
 });
 
-proposalsRouter.put('/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+proposalsRouter.put('/:id', async (req, res) => {
+  const existing = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Propuesta no encontrada' });
 
   const { title, drive_file_id, drive_link, notes } = req.body;
-  db.prepare(
+  await db.prepare(
     `UPDATE proposals SET title = ?, drive_file_id = ?, drive_link = ?, notes = ?, updated_at = datetime('now')
      WHERE id = ?`
   ).run(
@@ -161,30 +161,30 @@ proposalsRouter.put('/:id', (req, res) => {
     req.params.id
   );
 
-  const updated = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+  const updated = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
   res.json(updated);
 });
 
-proposalsRouter.patch('/:id/status', (req, res) => {
+proposalsRouter.patch('/:id/status', async (req, res) => {
   const { status } = req.body;
   if (!VALID_STATUSES.includes(status)) {
     return res.status(400).json({ error: `status debe ser uno de: ${VALID_STATUSES.join(', ')}` });
   }
 
-  const existing = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+  const existing = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Propuesta no encontrada' });
 
   const now = new Date().toISOString();
   const sentAt = status === 'enviada' && !existing.sent_at ? now : existing.sent_at;
   const respondedAt = ['aprobada', 'rechazada'].includes(status) ? now : existing.responded_at;
 
-  db.prepare(
+  await db.prepare(
     `UPDATE proposals SET status = ?, sent_at = ?, responded_at = ?, updated_at = datetime('now')
      WHERE id = ?`
   ).run(status, sentAt, respondedAt, req.params.id);
 
-  recordStatusChange(req.params.id, status);
+  await recordStatusChange(req.params.id, status);
 
-  const updated = db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
+  const updated = await db.prepare('SELECT * FROM proposals WHERE id = ?').get(req.params.id);
   res.json(updated);
 });

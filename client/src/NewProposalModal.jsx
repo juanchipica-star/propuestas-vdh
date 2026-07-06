@@ -10,7 +10,7 @@ export default function NewProposalModal({ initialTemplateId, initialClientId, o
   const [templates, setTemplates] = useState([]);
   const [clients, setClients] = useState([]);
   const [templateId, setTemplateId] = useState(initialTemplateId || '');
-  const [clientId, setClientId] = useState(initialClientId || '');
+  const [clientName, setClientName] = useState('');
   const [title, setTitle] = useState('');
   const [pricing, setPricing] = useState(emptyPricing);
   const [feeBreakdown, setFeeBreakdown] = useState(null);
@@ -25,7 +25,10 @@ export default function NewProposalModal({ initialTemplateId, initialClientId, o
     Promise.all([api.getTemplates(), api.getClients()]).then(([tpl, cl]) => {
       setTemplates(tpl.templates);
       setClients(cl);
-      if (!initialClientId && cl.length > 0) setClientId(cl[0].id);
+      if (initialClientId) {
+        const preset = cl.find((c) => String(c.id) === String(initialClientId));
+        if (preset) setClientName(preset.name);
+      }
       if (!initialTemplateId && tpl.templates.length > 0) setTemplateId(tpl.templates[0].id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -53,7 +56,11 @@ export default function NewProposalModal({ initialTemplateId, initialClientId, o
     setError('');
     setCreating(true);
     try {
-      const body = { template_id: Number(templateId), client_id: Number(clientId), title };
+      const trimmedName = clientName.trim();
+      const existing = clients.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase());
+      const client = existing || (await api.createClient({ name: trimmedName }));
+
+      const body = { template_id: Number(templateId), client_id: client.id, title };
       if (isSearchService && pricing.base_salary && pricing.fee_pct) {
         Object.assign(body, pricing);
       }
@@ -72,10 +79,8 @@ export default function NewProposalModal({ initialTemplateId, initialClientId, o
       <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
         <h3>Nueva propuesta</h3>
 
-        {clients.length === 0 || templates.length === 0 ? (
-          <p className="empty-state">
-            Necesitas al menos un cliente y una plantilla para crear una propuesta.
-          </p>
+        {templates.length === 0 ? (
+          <p className="empty-state">Necesitas al menos una plantilla para crear una propuesta.</p>
         ) : (
           <form onSubmit={onSubmit}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
@@ -92,13 +97,18 @@ export default function NewProposalModal({ initialTemplateId, initialClientId, o
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
               Cliente
-              <select value={clientId} onChange={(e) => setClientId(e.target.value)} required>
+              <input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                list="clientes-existentes"
+                placeholder="Escribi el nombre de la empresa"
+                required
+              />
+              <datalist id="clientes-existentes">
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
+                  <option key={c.id} value={c.name} />
                 ))}
-              </select>
+              </datalist>
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
